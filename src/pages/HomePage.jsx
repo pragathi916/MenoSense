@@ -1,232 +1,138 @@
-import { addDoc, collection, serverTimestamp } from "firebase/firestore";
-import React, { useEffect, useState } from "react";
-import { useAuthState } from "react-firebase-hooks/auth";
+import React, { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { auth, db, logout, app } from "../firebase";
-import {
-  getDownloadURL,
-  getStorage,
-  ref,
-  uploadBytesResumable,
-} from "firebase/storage";
-import { ToastContainer, toast } from "react-toastify";
-import "react-toastify/dist/ReactToastify.css";
-import PopupModal from "./PopupModal.jsx";
-
-const initialState = {
-  firstName: "",
-  lastName: "",
-  address: "",
-  age: "",
-  profession: "",
-};
+import { auth, logout } from "../firebase";
+import { useAuthState } from "react-firebase-hooks/auth";
+import { FaBars, FaTimes } from "react-icons/fa";
+import "./HomePage.css";
 
 const HomePage = () => {
-  const [user, loading, error] = useAuthState(auth);
-  const [progress, setProgress] = useState(false);
-  const [data, setData] = useState(initialState);
-  const [isSubmit, setIsSubmit] = useState(false);
-  const [file, setFile] = useState(null);
-  const { firstName, lastName, address, age, profession } = data;
+  const [user] = useAuthState(auth);
   const navigate = useNavigate();
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
-  const handleChange = (e) => {
-    setData({ ...data, [e.target.name]: e.target.value });
-  };
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    if (firstName === "") {
-      toast.error("First Name is required!");
-    } else if (lastName === "") {
-      toast.error("Last Name is required!");
-    } else if (address === "") {
-      toast.error("Enter your Address!");
-    } else if (profession === "") {
-      toast.error("Enter your Profession!");
-    } else if (age === "") {
-      toast.error("Age is required!");
-    } else {
-      setIsSubmit(true);
-      await addDoc(collection(db, "users"), {
-        ...data,
-        email: user.email,
-        uid: user.uid,
-        timestamp: serverTimestamp(),
-      });
-      setTimeout(() => {
-        navigate("/profile");
-      }, 5000);
-    }
-  };
-
+  // Close sidebar when clicking outside (mobile only)
   useEffect(() => {
-    const uploadFile = () => {
-      const storage = getStorage(app);
-      const storageRef = ref(storage, `images/${file.name}`);
-      const uploadTask = uploadBytesResumable(storageRef, file);
-      uploadTask.on(
-        "state_changed",
-        (snapshot) => {
-          const progress =
-            (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
-          setProgress(progress);
-          if (progress === 1) {
-            toast.success(`Uploading image`);
-          }
-          if (progress === 100) {
-            toast.success("Profile picture uploaded successfully");
-          }
-          console.log("Upload is " + progress + "% done");
-          switch (snapshot.state) {
-            case "paused":
-              toast.error("Upload is paused");
-              console.log("Upload is paused");
-              break;
-            case "running":
-              console.log("Upload is running");
-              break;
-            default:
-              break;
-          }
-        },
-        (error) => {
-          alert(error.message);
-          toast.error(`${error.message}`);
-        },
-        () => {
-          getDownloadURL(uploadTask.snapshot.ref).then((downloadURL) => {
-            console.log("File available at", downloadURL);
-            setData((prev) => ({ ...prev, img: downloadURL }));
-          });
+    const handleClickOutside = (event) => {
+      if (sidebarOpen && window.innerWidth <= 1023) {
+        const sidebar = document.querySelector(".sidebar");
+        const menuBtn = document.querySelector(".menu-btn");
+
+        if (sidebar && !sidebar.contains(event.target) && !menuBtn.contains(event.target)) {
+          setSidebarOpen(false);
         }
-      );
+      }
     };
-    file && uploadFile();
-    if (loading) {
-      return;
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [sidebarOpen]);
+
+  // Close sidebar when resizing to large screens
+  useEffect(() => {
+    const handleResize = () => {
+      if (window.innerWidth > 1023 && sidebarOpen) {
+        setSidebarOpen(false);
+      }
+    };
+
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, [sidebarOpen]);
+
+  // Prevent body scroll on mobile when sidebar is open
+  useEffect(() => {
+    if (sidebarOpen && window.innerWidth <= 1023) {
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "unset";
     }
-    if (!user) {
-      return navigate("/login");
-    }
-  }, [user, loading, navigate, file]);
+
+    return () => {
+      document.body.style.overflow = "unset";
+    };
+  }, [sidebarOpen]);
 
   return (
-    <div className="-z-10">
-      {error && <div> {error}</div>}
-      <div className=" flex items-center justify-between py-4">
-        <Link to={"/profile"}>
-          <button className="bg-purple-700 text-white text-xs sm:text-base px-5 py-2 rounded-full">
-            Profile
-          </button>
-        </Link>{" "}
+    <div className="homepage">
+      {/* Header */}
+      <header className="header">
+        <h1 className="logo">MenoSense</h1>
         <button
-          onClick={logout}
-          className="bg-purple-700 text-white text-xs sm:text-base rounded-full py-2 px-5"
+          className="menu-btn"
+          onClick={() => setSidebarOpen(!sidebarOpen)}
+          aria-label="Toggle menu"
         >
-          Logout
+          {sidebarOpen ? <FaTimes /> : <FaBars />}
         </button>
-      </div>
-      <div className="border-[1px] border-gray-300" />
-      <h1 className="text-purple-700 p-3 mt-3 text-center text-base xs:text-xl font-black">
-        Hello {user && user.email}{" "}
-      </h1>
-      <h2 className="mt-1 text-2xl text-center">User Details Form </h2>
-      <p className="mb-2 text-center text-gray-500">
-        Fill all the details to create your profile
-      </p>
-      <form
-        onSubmit={handleSubmit}
-        className="flex flex-col justify-center items-center"
-      >
-        <label className="relative">
-          <input
-            type="text"
-            name="firstName"
-            value={firstName}
-            id=""
-            onChange={handleChange}
-            className="my-2 mx-1 w-[270px] h-[30] xs:w-[360px] xs:h-[40px] md:w-[450px] md:h-[50px] px-6 py-3 rounded-full outline-none border-[1px] border-gray-400 focus:border-purple-500 transition duration-200"
-          />
-          <span className=" absolute w-[100px] top-5 text-gray-500 left-0 mx-6 px-2 transition duration-300 input-text">
-            {firstName ? "" : "First name"}
-          </span>
-        </label>
-        <label className="relative">
-          <input
-            type="text"
-            name="lastName"
-            value={lastName}
-            id=""
-            onChange={handleChange}
-            className="my-2 mx-1 w-[270px] h-[30] xs:w-[360px] xs:h-[40px] md:w-[450px] md:h-[50px] px-6 py-3 rounded-full outline-none border-[1px] border-gray-400 focus:border-purple-500 transition duration-200"
-          />
-          <span className="absolute w-[100px] top-5 text-gray-500 left-0 mx-6 px-2 transition duration-300 input-text">
-            {lastName ? "" : "Last name"}
-          </span>
-        </label>
-        <label className="relative">
-          <input
-            type="text"
-            name="address"
-            value={address}
-            id=""
-            onChange={handleChange}
-            className="my-2 mx-1 w-[270px] h-[30] xs:w-[360px] xs:h-[40px] md:w-[450px] md:h-[50px] px-6 py-3 rounded-full outline-none border-[1px] border-gray-400 focus:border-purple-500 transition duration-200"
-          />
-          <span className="absolute w-[90px] top-5 text-gray-500 left-0 mx-6 px-2 transition duration-300 input-text">
-            {address ? "" : "Address"}
-          </span>
-        </label>
-        <label className="relative">
-          <input
-            type="text"
-            name="profession"
-            value={profession}
-            id=""
-            onChange={handleChange}
-            className="my-2 mx-1 w-[270px] h-[30] xs:w-[360px] xs:h-[40px] md:w-[450px] md:h-[50px] px-6 py-3 rounded-full outline-none border-[1px] border-gray-400 focus:border-purple-500 transition duration-200"
-          />
-          <span className="absolute w-[110px] top-5 text-gray-500 left-0 mx-6 px-2 transition duration-300 input-text">
-            {profession ? "" : "Profession"}
-          </span>
-        </label>
-        <label className="relative">
-          <input
-            type="text"
-            name="age"
-            value={age}
-            id=""
-            onChange={handleChange}
-            className="my-2 mx-1 w-[270px] h-[30] xs:w-[360px] xs:h-[40px] md:w-[450px] md:h-[50px] px-6 py-3 rounded-full outline-none border-[1px] border-gray-400 focus:border-purple-500 transition duration-200"
-          />
-          <span className="absolute w-[60px] top-5 text-gray-500 left-0 mx-6 px-2 transition duration-300 input-text">
-            {age ? "" : "Age"}
-          </span>
-        </label>
+      </header>
 
-        <div className="flex flex-col items-center justify-center gap-3 my-5 ">
-          <p className="font-medium">Choose your profile picture :</p>
-          <input
-            type="file"
-            onChange={(e) => setFile(e.target.files[0])}
-            className="ml-[80px]"
-          />
-        </div>
-        <button
-          type="submit"
-          disabled={progress !== null && progress < 100}
-          className={`${
-            progress !== null && progress < 100
-              ? "bg-gray-300"
-              : "bg-violet-700  hover:bg-violet-800"
-          } text-white text-base w-[270px] h-[30] xs:w-[360px] xs:h-[40px] md:w-[450px] md:h-[50px] p-2 md:p-0 rounded-full transition my-3`}
-        >
-          {progress > 1 && progress < 100 ? "Uploading" : "Submit"}
-        </button>
-        <ToastContainer />
-      </form>
-      <PopupModal open={isSubmit} name={firstName} className="z-50" />
+      <div className="container">
+        {/* Overlay */}
+        <div
+          className={`overlay ${sidebarOpen ? "show" : ""}`}
+          onClick={() => setSidebarOpen(false)}
+        />
+
+        {/* Sidebar */}
+        <aside className={`sidebar ${sidebarOpen ? "open" : ""}`}>
+          <div className="profile-section">
+            <img
+              src={user?.photoURL || "https://via.placeholder.com/80"}
+              alt="Profile"
+              className="profile-pic"
+            />
+            <p className="email">{user?.email || "Guest User"}</p>
+          </div>
+          <nav className="sidebar-nav">
+            <Link
+              to="/profile"
+              onClick={() => setSidebarOpen(false)}
+              className="nav-link"
+            >
+              View Profile
+            </Link>
+            <button
+              onClick={() => {
+                logout();
+                setSidebarOpen(false);
+              }}
+              className="logout-btn"
+            >
+              Logout
+            </button>
+          </nav>
+        </aside>
+
+        {/* Main Content */}
+        <main className="main-content">
+          <div className="tile">
+            <h2>Connect Your Device</h2>
+            <p className="tile-description">
+              Sync your health monitoring device to track your menopause journey
+            </p>
+            <button onClick={() => alert("Device Connected!")}>
+              Connect Now
+            </button>
+          </div>
+
+          <div className="tile">
+            <h2>Answer Questionnaire</h2>
+            <p className="tile-description">
+              Complete our comprehensive questionnaire to personalize your
+              experience
+            </p>
+            <button onClick={() => navigate("/questionnaire")}>Start</button>
+          </div>
+
+          <div className="tile">
+            <h2>Know More About MenoCycle</h2>
+            <p className="tile-description">
+              Learn about menopause stages and what to expect
+            </p>
+            <button onClick={() => navigate("/menocycle")}>Learn More</button>
+          </div>
+        </main>
+      </div>
     </div>
   );
 };

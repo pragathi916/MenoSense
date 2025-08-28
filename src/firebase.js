@@ -1,20 +1,15 @@
 import { initializeApp } from "firebase/app";
-import {
-  GoogleAuthProvider,
-  GithubAuthProvider,
-  getAuth,
-  signInWithPopup,
-  signOut,
-} from "firebase/auth";
-import { getFirestore } from "firebase/firestore";
+import { getFirestore, setDoc, doc } from "firebase/firestore";
+import { GoogleAuthProvider, getAuth, signInWithPopup, signOut } from "firebase/auth";
 
 const firebaseConfig = {
-  apiKey: "AIzaSyCgq9_xbC2zMLV_gIrGlBnpryRN_toiHW4",
-  authDomain: "login-signup-auth-ks.firebaseapp.com",
-  projectId: "login-signup-auth-ks",
-  storageBucket: "login-signup-auth-ks.appspot.com",
-  messagingSenderId: "153852426357",
-  appId: "1:153852426357:web:0dace21431a9f096a2203c",
+  apiKey: "AIzaSyCgo432VGwUMsXWsdl214TjKo7CEWV8brE",
+  authDomain: "menosense-f185d.firebaseapp.com",
+  projectId: "menosense-f185d",
+  storageBucket: "menosense-f185d.firebasestorage.app",
+  messagingSenderId: "814917505078",
+  appId: "1:814917505078:web:0f0a1231ece058b6510897",
+  measurementId: "G-Y0RHS1L6Z9"
 };
 
 const app = initializeApp(firebaseConfig);
@@ -22,23 +17,22 @@ const auth = getAuth(app);
 const db = getFirestore(app);
 
 const googleProvider = new GoogleAuthProvider();
+
 const signInWithGoogle = async () => {
   try {
     const res = await signInWithPopup(auth, googleProvider);
     const user = res.user;
-    console.log(user);
-  } catch (err) {
-    console.error(err);
-    alert(err.message);
-  }
-};
 
-const githubProvider = new GithubAuthProvider();
-const signInWithGithub = async () => {
-  try {
-    const res = await signInWithPopup(auth, githubProvider);
-    const user = res.user;
-    console.log(user);
+    // Save or update user in Firestore
+    await setDoc(doc(db, "users", user.uid), {
+      uid: user.uid,
+      email: user.email,
+      firstName: user.displayName?.split(" ")[0] || "",
+      lastName: user.displayName?.split(" ")[1] || "",
+      img: user.photoURL || "",
+    }, { merge: true });
+
+    console.log("Google user logged in & saved to Firestore");
   } catch (err) {
     console.error(err);
     alert(err.message);
@@ -49,4 +43,4 @@ const logout = () => {
   signOut(auth);
 };
 
-export { app, auth, db, signInWithGoogle, signInWithGithub, logout };
+export { app, auth, db, signInWithGoogle, logout };
